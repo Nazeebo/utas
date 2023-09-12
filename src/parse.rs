@@ -85,7 +85,7 @@ pub fn parse<T: AsRef<Path>>(path: T) -> Result<File, String> {
     // See NOTE_DEDUPLICATING_KEYS
     let temp_file =
         NamedTempFile::new().map_err(|_| "failed to create temporary file".to_string())?;
-    dedup_keys(&path, &temp_file).map_err(|_| "failed to dedup keys".to_string())?;
+    dedup_keys(&path, &temp_file).map_err(|error| (error.to_string() + "failed to dedup keys").to_string())?;
     let map = config.load(temp_file)?;
 
     // NOTE: twine has this structure
@@ -122,13 +122,13 @@ pub fn parse<T: AsRef<Path>>(path: T) -> Result<File, String> {
 // TODO remove this function and write a custom parser
 // See NOTE_DEDUPLICATING_KEYS
 fn dedup_keys<T: AsRef<Path>, W: Write>(path: &T, temp_file: W) -> io::Result<()> {
-    let f = FsFile::open(path)?;
+    let f = FsFile::open(path).expect("File opening failed");
     let f = BufReader::new(f);
     let mut of = BufWriter::new(temp_file);
     let mut keys: HashSet<String> = HashSet::new();
 
     for line in f.lines() {
-        let l = line?;
+        let l = line.expect("Line reading failed");
         let maybe_key = l.trim();
         let out_line: String;
         if keys.iter().any(|x| x == maybe_key) {
@@ -143,7 +143,7 @@ fn dedup_keys<T: AsRef<Path>, W: Write>(path: &T, temp_file: W) -> io::Result<()
             }
             out_line = format!("{}\n", maybe_key);
         }
-        of.write(out_line.as_bytes())?;
+        of.write(out_line.as_bytes()).expect("Write to file failed");
     }
     Ok(())
 }
